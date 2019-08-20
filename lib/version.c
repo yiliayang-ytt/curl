@@ -202,6 +202,11 @@ char *curl_version(void)
 */
   }
 #endif
+#ifdef USE_HSTS
+  len = msnprintf(ptr, left, " libhsts/%s", hsts_get_version());
+  left -= len;
+  ptr += len;
+#endif
 
   /* Silent scan-build even if librtmp is not enabled. */
   (void) left;
@@ -367,8 +372,13 @@ static curl_version_info_data version_info = {
 #if defined(USE_ALTSVC)
   | CURL_VERSION_ALTSVC
 #endif
+<<<<<<< HEAD
 #ifdef USE_ESNI
   | CURL_VERSION_ESNI
+=======
+#ifdef USE_HSTS
+  | CURL_VERSION_HSTS
+>>>>>>> 54941ff78 (HSTS: support for HTTP Strict Transport Security using libhsts)
 #endif
   ,
   NULL, /* ssl_version */

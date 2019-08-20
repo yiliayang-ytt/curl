@@ -542,7 +542,11 @@ static const struct feat feats[] = {
   {"MultiSSL",       CURL_VERSION_MULTI_SSL},
   {"PSL",            CURL_VERSION_PSL},
   {"alt-svc",        CURL_VERSION_ALTSVC},
+<<<<<<< HEAD
   {"ESNI",           CURL_VERSION_ESNI},
+=======
+  {"HSTS",           CURL_VERSION_HSTS},
+>>>>>>> 54941ff78 (HSTS: support for HTTP Strict Transport Security using libhsts)
 };
 
 void tool_help(void)
