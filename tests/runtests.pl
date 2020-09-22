@@ -2680,6 +2680,7 @@ sub checksystem {
                 # This is a Windows MinGW build or native build, we need to use
                 # Win32-style path.
                 $pwd = pathhelp::sys_native_current_path();
+                $has_textaware = 1;
             }
            if ($libcurl =~ /(winssl|schannel)/i) {
                $has_winssl=1;
@@ -3030,7 +3031,6 @@ sub checksystem {
             }
         }
     }
-    $has_textaware = ($^O eq 'MSWin32') || ($^O eq 'msys');
 
     logmsg "***************************************** \n";
 

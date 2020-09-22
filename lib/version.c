@@ -104,14 +104,12 @@ char *curl_version(void)
   left -= len;
   ptr += len;
 
-  if(left > 1) {
-    len = Curl_ssl_version(ptr + 1, left - 1);
+  len = Curl_ssl_version(ptr + 1, left - 1);
 
-    if(len > 0) {
-      *ptr = ' ';
-      left -= ++len;
-      ptr += len;
-    }
+  if(len > 0) {
+    *ptr = ' ';
+    left -= ++len;
+    ptr += len;
   }
 
 #ifdef HAVE_LIBZ
@@ -374,8 +372,10 @@ static curl_version_info_data version_info = {
 #if defined(USE_ALTSVC)
   | CURL_VERSION_ALTSVC
 #endif
+
 #ifdef USE_HSTS
   | CURL_VERSION_HSTS
+
 #endif
   ,
   NULL, /* ssl_version */

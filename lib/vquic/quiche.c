@@ -50,7 +50,7 @@
 
 #define QUIC_MAX_STREAMS (256*1024)
 #define QUIC_MAX_DATA (1*1024*1024)
-#define QUIC_IDLE_TIMEOUT 60 * 1000 /* milliseconds */
+#define QUIC_IDLE_TIMEOUT (60 * 1000) /* milliseconds */
 
 static CURLcode process_ingress(struct connectdata *conn,
                                 curl_socket_t sockfd,
@@ -116,7 +116,7 @@ static CURLcode quiche_do(struct connectdata *conn, bool *done)
   return Curl_http(conn, done);
 }
 
-static const struct Curl_handler Curl_handler_h3_quiche = {
+static const struct Curl_handler Curl_handler_http3 = {
   "HTTPS",                              /* scheme */
   ZERO_NULL,                            /* setup_connection */
   quiche_do,                            /* do_it */
@@ -203,17 +203,17 @@ CURLcode Curl_quic_connect(struct connectdata *conn, curl_socket_t sockfd,
   if(result)
     return result;
 
-#if 0
   /* store the used address as a string */
-  if(!Curl_addr2string((struct sockaddr*)addr,
+  if(!Curl_addr2string((struct sockaddr*)addr, addrlen,
                        conn->primary_ip, &conn->primary_port)) {
     char buffer[STRERROR_LEN];
     failf(data, "ssrem inet_ntop() failed with errno %d: %s",
-          errno, Curl_strerror(errno, buffer, sizeof(buffer)));
+          SOCKERRNO, Curl_strerror(SOCKERRNO, buffer, sizeof(buffer)));
     return CURLE_BAD_FUNCTION_ARGUMENT;
   }
   memcpy(conn->ip_addr_str, conn->primary_ip, MAX_IPADR_LEN);
-#endif
+  Curl_persistconninfo(conn);
+
   /* for connection reuse purposes: */
   conn->ssl[FIRSTSOCKET].state = ssl_connection_complete;
 
@@ -232,12 +232,12 @@ static CURLcode quiche_has_connected(struct connectdata *conn,
 
   conn->recv[sockindex] = h3_stream_recv;
   conn->send[sockindex] = h3_stream_send;
-  conn->handler = &Curl_handler_h3_quiche;
+  conn->handler = &Curl_handler_http3;
   conn->bits.multiplex = TRUE; /* at least potentially multiplexed */
   conn->httpversion = 30;
   conn->bundle->multiuse = BUNDLE_MULTIPLEX;
 
-  qs->h3config = quiche_h3_config_new(0, 1024, 0, 0);
+  qs->h3config = quiche_h3_config_new();
   if(!qs->h3config)
     return CURLE_OUT_OF_MEMORY;
 
@@ -301,7 +301,7 @@ static CURLcode process_ingress(struct connectdata *conn, int sockfd,
 
   do {
     recvd = recv(sockfd, buf, bufsize, 0);
-    if((recvd < 0) && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))
+    if((recvd < 0) && ((SOCKERRNO == EAGAIN) || (SOCKERRNO == EWOULDBLOCK)))
       break;
 
     if(recvd < 0) {
@@ -404,13 +404,14 @@ static ssize_t h3_stream_recv(struct connectdata *conn,
   quiche_h3_event *ev;
   int rc;
   struct h3h1header headers;
-  struct HTTP *stream = conn->data->req.protop;
+  struct Curl_easy *data = conn->data;
+  struct HTTP *stream = data->req.protop;
   headers.dest = buf;
   headers.destlen = buffersize;
   headers.nlen = 0;
 
   if(process_ingress(conn, sockfd, qs)) {
-    infof(conn->data, "h3_stream_recv returns on ingress\n");
+    infof(data, "h3_stream_recv returns on ingress\n");
     *curlcode = CURLE_RECV_ERROR;
     return -1;
   }
@@ -423,7 +424,7 @@ static ssize_t h3_stream_recv(struct connectdata *conn,
 
     if(s != stream->stream3_id) {
       /* another transfer, ignore for now */
-      infof(conn->data, "Got h3 for stream %u, expects %u\n",
+      infof(data, "Got h3 for stream %u, expects %u\n",
             s, stream->stream3_id);
       continue;
     }
@@ -442,7 +443,7 @@ static ssize_t h3_stream_recv(struct connectdata *conn,
         buf[0] = '\r';
         buf[1] = '\n';
         buf += 2;
-        buffersize = 2;
+        buffersize -= 2;
         stream->firstbody = TRUE;
         recvd = 2; /* two bytes already */
       }
@@ -458,9 +459,7 @@ static ssize_t h3_stream_recv(struct connectdata *conn,
       break;
 
     case QUICHE_H3_EVENT_FINISHED:
-      if(quiche_conn_close(qs->conn, true, 0, NULL, 0) < 0) {
-        ;
-      }
+      streamclose(conn, "End of stream");
       recvd = 0; /* end of stream */
       break;
     default:
@@ -475,6 +474,11 @@ static ssize_t h3_stream_recv(struct connectdata *conn,
   }
 
   *curlcode = (-1 == recvd)? CURLE_AGAIN : CURLE_OK;
+  if(recvd >= 0)
+    /* Get this called again to drain the event queue */
+    Curl_expire(data, 0, EXPIRE_QUIC);
+
+  data->state.drain = (recvd >= 0) ? 1 : 0;
   return recvd;
 }
 
@@ -498,7 +502,10 @@ static ssize_t h3_stream_send(struct connectdata *conn,
     sent = len;
   }
   else {
-    sent = quiche_conn_stream_send(qs->conn, 0, mem, len, true);
+    H3BUGF(infof(conn->data, "Pass on %zd body bytes to quiche\n",
+                 len));
+    sent = quiche_h3_send_body(qs->h3c, qs->conn, stream->stream3_id,
+                               (uint8_t *)mem, len, FALSE);
     if(sent < 0) {
       *curlcode = CURLE_SEND_ERROR;
       return -1;
@@ -640,8 +647,10 @@ static CURLcode http_request(struct connectdata *conn, const void *mem,
       nva[i].name_len = strlen((char *)nva[i].name);
     }
     else {
-      nva[i].name = (unsigned char *)hdbuf;
       nva[i].name_len = (size_t)(end - hdbuf);
+      /* Lower case the header name for HTTP/3 */
+      Curl_strntolower((char *)hdbuf, hdbuf, nva[i].name_len);
+      nva[i].name = (unsigned char *)hdbuf;
     }
     hdbuf = end + 1;
     while(*hdbuf == ' ' || *hdbuf == '\t')
@@ -750,5 +759,25 @@ fail:
   return result;
 }
 
+/*
+ * Called from transfer.c:done_sending when we stop HTTP/3 uploading.
+ */
+CURLcode Curl_quic_done_sending(struct connectdata *conn)
+{
+  if(conn->handler == &Curl_handler_http3) {
+    /* only for HTTP/3 transfers */
+    ssize_t sent;
+    struct HTTP *stream = conn->data->req.protop;
+    struct quicsocket *qs = conn->quic;
+    fprintf(stderr, "!!! Curl_quic_done_sending\n");
+    stream->upload_done = TRUE;
+    sent = quiche_h3_send_body(qs->h3c, qs->conn, stream->stream3_id,
+                               NULL, 0, TRUE);
+    if(sent < 0)
+      return CURLE_SEND_ERROR;
+  }
+
+  return CURLE_OK;
+}
 
 #endif

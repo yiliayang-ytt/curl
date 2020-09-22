@@ -25,7 +25,7 @@ s/upstream tests 305 and 404//
 s/Gaël PORTAY/Gaël Portay/
 s/Romulo Ceccon/Romulo A. Ceccon/
 s/Nach M. S$/Nach M. S./
-s/Jay Satiro/Ray Satiro/
+s/Ja[yt] Satiro/Ray Satiro/
 s/Richard J. Moore/Richard Moore/
 s/Sergey Nikulov/Sergei Nikulov/
 s/Petr Písař/Petr Pisar/
@@ -98,3 +98,4 @@ s/Jason Priebe/Jason S. Priebe/
 s/Ale Vesely/Alessandro Vesely/
 s/Yamada Yasuharu/Yasuharu Yamada/
 s/Jim Gallagher/James Gallagher/
+s/Steve Brokenshire/Stephen Brokenshire/

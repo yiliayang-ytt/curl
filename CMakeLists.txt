@@ -260,7 +260,7 @@ if(ENABLE_THREADED_RESOLVER)
 endif()
 
 # Check for all needed libraries
-check_library_exists_concat("dl"     dlopen       HAVE_LIBDL)
+check_library_exists_concat("${CMAKE_DL_LIBS}" dlopen HAVE_LIBDL)
 check_library_exists_concat("socket" connect      HAVE_LIBSOCKET)
 check_library_exists("c" gethostbyname "" NOT_NEED_LIBNSL)
 
@@ -347,8 +347,6 @@ if(CMAKE_USE_OPENSSL)
   find_package(OpenSSL REQUIRED)
   set(SSL_ENABLED ON)
   set(USE_OPENSSL ON)
-  set(HAVE_LIBCRYPTO ON)
-  set(HAVE_LIBSSL ON)
 
   # Depend on OpenSSL via imported targets if supported by the running
   # version of CMake.  This allows our dependents to get our dependencies
