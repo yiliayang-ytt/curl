@@ -324,6 +324,10 @@ typedef enum {
 #include <iconv.h>
 #endif
 
+#ifdef USE_HSTS
+#include <libhsts.h>
+#endif
+
 /* Struct used for GSSAPI (Kerberos V5) authentication */
 #if defined(USE_KERBEROS5)
 struct kerberos5data {
@@ -1753,26 +1757,29 @@ struct UserDefined {
 #if defined(HAVE_GSSAPI) || defined(USE_WINDOWS_SSPI)
   BIT(socks5_gssapi_nec); /* Flag to support NEC SOCKS5 server */
 #endif
-  BIT(sasl_ir);         /* Enable/disable SASL initial response */
-  BIT(wildcard_enabled); /* enable wildcard matching */
-  BIT(tcp_keepalive);  /* use TCP keepalives */
-  BIT(tcp_fastopen);   /* use TCP Fast Open */
-  BIT(ssl_enable_npn); /* TLS NPN extension? */
-  BIT(ssl_enable_alpn);/* TLS ALPN extension? */
-  BIT(path_as_is);     /* allow dotdots? */
-  BIT(pipewait);       /* wait for multiplex status before starting a new
-                          connection */
-  BIT(suppress_connect_headers); /* suppress proxy CONNECT response headers
-                                    from user callbacks */
-  BIT(dns_shuffle_addresses); /* whether to shuffle addresses before use */
-  BIT(stream_depends_e); /* set or don't set the Exclusive bit */
-  BIT(haproxyprotocol); /* whether to send HAProxy PROXY protocol v1
-                           header */
-  BIT(abstract_unix_socket);
-  BIT(disallow_username_in_url); /* disallow username in url */
-  BIT(doh); /* DNS-over-HTTPS enabled */
-  BIT(doh_get); /* use GET for DoH requests, instead of POST */
-  BIT(http09_allowed); /* allow HTTP/0.9 responses */
+  bit sasl_ir:1;         /* Enable/disable SASL initial response */
+  bit wildcard_enabled:1; /* enable wildcard matching */
+  bit tcp_keepalive:1;  /* use TCP keepalives */
+  bit tcp_fastopen:1;   /* use TCP Fast Open */
+  bit ssl_enable_npn:1; /* TLS NPN extension? */
+  bit ssl_enable_alpn:1;/* TLS ALPN extension? */
+  bit path_as_is:1;     /* allow dotdots? */
+  bit pipewait:1;       /* wait for multiplex status before starting a new
+                           connection */
+  bit suppress_connect_headers:1; /* suppress proxy CONNECT response headers
+                                      from user callbacks */
+  bit dns_shuffle_addresses:1; /* whether to shuffle addresses before use */
+  bit stream_depends_e:1; /* set or don't set the Exclusive bit */
+  bit haproxyprotocol:1; /* whether to send HAProxy PROXY protocol v1
+                             header */
+  bit abstract_unix_socket:1;
+  bit disallow_username_in_url:1; /* disallow username in url */
+  bit doh:1; /* DNS-over-HTTPS enabled */
+  bit doh_get:1; /* use GET for DoH requests, instead of POST */
+  bit http09_allowed:1; /* allow HTTP/0.9 responses */
+#ifdef USE_HSTS
+  hsts_t *hsts; /* libhsts handle */
+#endif
 };
 
 struct Names {
